@@ -1,0 +1,2 @@
+export const HEARING_TYPES = ['First Hearing', 'Preliminary Hearing', 'Admission', 'Notice', 'Evidence', 'Witness Examination', 'Cross Examination', 'Arguments', 'Final Arguments', 'Judgment', 'Order', 'Interim Application', 'Bail Hearing', 'Mediation', 'Review', 'Other'] as const;
+export const HEARING_STATUSES = ['Scheduled', 'Completed', 'Adjourned', 'Cancelled', 'Postponed', 'Awaiting Order'] as const;

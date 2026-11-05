@@ -1,0 +1,34 @@
+import { useState } from 'react';
+import { Alert, Pressable, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import { AppText } from '../../../components/common/AppText';
+import { Button } from '../../../components/common/Button';
+import { Card } from '../../../components/common/Card';
+import { ChoiceChips } from '../../../components/common/ChoiceChips';
+import { EmptyState } from '../../../components/common/EmptyState';
+import { ErrorState } from '../../../components/common/ErrorState';
+import { LoadingSkeleton } from '../../../components/common/LoadingSkeleton';
+import { Notice } from '../../../components/common/Notice';
+import { TextField } from '../../../components/common/TextField';
+import { Screen } from '../../../components/layout/Screen';
+import { clientApi, type Interaction } from '../../../services/client-api';
+import { useTheme } from '../../../theme/tokens';
+import { friendlyError } from '../../../utils/errors';
+
+type InteractionType = Interaction['interaction_type'];
+const nowInput = () => new Date().toISOString().slice(0, 16);
+export default function ClientInteractions() {
+  const { id } = useLocalSearchParams<{ id: string }>(); const { t } = useTranslation(); const theme = useTheme(); const cache = useQueryClient(); const [editing, setEditing] = useState<Interaction | null>(null); const [type, setType] = useState<InteractionType>('consultation'); const [date, setDate] = useState(nowInput); const [subject, setSubject] = useState(''); const [description, setDescription] = useState(''); const [followUp, setFollowUp] = useState<'no' | 'yes'>('no'); const [followUpDate, setFollowUpDate] = useState(''); const [saving, setSaving] = useState(false); const [formError, setFormError] = useState<string | null>(null);
+  const query = useQuery({ queryKey: ['client-interactions', id], queryFn: () => clientApi.interactions(id), enabled: !!id });
+  const reset = () => { setEditing(null); setType('consultation'); setDate(nowInput()); setSubject(''); setDescription(''); setFollowUp('no'); setFollowUpDate(''); setFormError(null); };
+  const edit = (item: Interaction) => { setEditing(item); setType(item.interaction_type); setDate(item.interaction_date.slice(0, 16)); setSubject(item.subject); setDescription(item.description); setFollowUp(item.follow_up_required ? 'yes' : 'no'); setFollowUpDate(item.follow_up_date ?? ''); };
+  const save = async () => { const parsed = new Date(date); if (!subject.trim() || !description.trim() || Number.isNaN(parsed.getTime()) || followUp === 'yes' && !/^\d{4}-\d{2}-\d{2}$/.test(followUpDate)) { setFormError(t('validation.required')); return; } setSaving(true); setFormError(null); const data = { interaction_type: type, interaction_date: parsed.toISOString(), subject: subject.trim(), description: description.trim(), follow_up_required: followUp === 'yes', follow_up_date: followUp === 'yes' ? followUpDate : null }; try { if (editing) await clientApi.updateInteraction(id, editing.id, data); else await clientApi.addInteraction(id, data); reset(); await Promise.all([query.refetch(), cache.invalidateQueries({ queryKey: ['dashboard'] }), cache.invalidateQueries({ queryKey: ['activities'] })]); } catch (caught) { setFormError(friendlyError(caught)); } finally { setSaving(false); } };
+  const remove = (item: Interaction) => Alert.alert(t('clients.interactions'), t('clients.deleteInteraction'), [{ text: t('cancel'), style: 'cancel' }, { text: t('clients.delete'), style: 'destructive', onPress: async () => { await clientApi.deleteInteraction(id, item.id); if (editing?.id === item.id) reset(); await query.refetch(); } }]);
+  const today = new Date().toISOString().slice(0, 10);
+  return <Screen title={t('clients.interactions')} back refreshing={query.isRefetching} onRefresh={() => { void query.refetch(); }}>
+    {formError && <Notice message={formError} />}<Card><AppText style={{ fontSize: 18, fontWeight: '800', marginBottom: 14 }}>{t(editing ? 'clients.editInteraction' : 'clients.addInteraction')}</AppText><AppText style={{ fontWeight: '600', marginBottom: 8 }}>{t('clients.interactionType')}</AppText><ChoiceChips value={type} onChange={setType} options={(['consultation', 'phone_call', 'meeting', 'email', 'other'] as InteractionType[]).map((value) => ({ value, label: t(value === 'email' ? 'clients.email' : `clients.${value}`) }))} /><TextField label={t('clients.interactionDate')} value={date} onChangeText={setDate} /><TextField label={t('clients.subject')} value={subject} onChangeText={setSubject} autoCapitalize="words" /><TextField label={t('clients.description')} value={description} onChangeText={setDescription} multiline /><AppText style={{ fontWeight: '600', marginBottom: 8 }}>{t('clients.followUp')}</AppText><ChoiceChips value={followUp} onChange={setFollowUp} options={[{ value: 'no', label: t('settings2.no') }, { value: 'yes', label: t('settings2.yes') }]} />{followUp === 'yes' && <TextField label={t('clients.followUpDate')} value={followUpDate} onChangeText={setFollowUpDate} />}<View style={{ gap: 8 }}><Button label={t('save')} loading={saving} onPress={() => { void save(); }} />{editing && <Button label={t('cancel')} variant="text" onPress={reset} />}</View></Card>
+    <View style={{ marginTop: 20 }}>{query.isPending ? <LoadingSkeleton /> : query.isError ? <ErrorState message={friendlyError(query.error)} retry={() => { void query.refetch(); }} /> : !query.data?.length ? <EmptyState title={t('clients.noInteractions')} body={t('clients.noInteractionsDetail')} /> : <View style={{ gap: 10 }}>{query.data.map((item) => { const followLabel = item.follow_up_required && item.follow_up_date ? item.follow_up_date < today ? 'overdue' : item.follow_up_date === today ? 'due' : null : null; return <Card key={item.id}><AppText style={{ fontWeight: '800' }}>{item.subject}</AppText><AppText style={{ color: theme.colors.accent, fontSize: 13 }}>{t(item.interaction_type === 'email' ? 'clients.email' : `clients.${item.interaction_type}`)} · {new Date(item.interaction_date).toLocaleString()}</AppText><AppText style={{ color: theme.colors.muted, marginTop: 6 }}>{item.description}</AppText>{item.follow_up_date && <AppText style={{ color: followLabel === 'overdue' ? theme.colors.danger : theme.colors.success, fontSize: 13, fontWeight: '700', marginTop: 7 }}>{followLabel ? t(`clients.${followLabel}`) : t('clients.followUp')}: {item.follow_up_date}</AppText>}<View style={{ flexDirection: 'row', gap: 18, marginTop: 8 }}><Pressable onPress={() => edit(item)}><AppText style={{ color: theme.colors.accent, fontWeight: '700' }}>{t('clients.editInteraction')}</AppText></Pressable><Pressable onPress={() => remove(item)}><AppText style={{ color: theme.colors.danger, fontWeight: '700' }}>{t('clients.delete')}</AppText></Pressable></View></Card>; })}</View>}</View>
+  </Screen>;
+}

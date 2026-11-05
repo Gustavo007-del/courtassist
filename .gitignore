@@ -1,0 +1,21 @@
+.env
+*.pyc
+__pycache__/
+.venv/
+.pytest_cache/
+node_modules/
+.expo/
+dist/
+dist-check/
+build/
+*.db
+*.sqlite3
+private_uploads/
+
+
+git init
+gh repo create courtassist --public --source=. --remote=origin
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git push -u origin main

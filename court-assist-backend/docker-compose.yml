@@ -1,0 +1,33 @@
+services:
+  api:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://courtassist:${POSTGRES_PASSWORD}@db:5432/courtassist
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      - profile_uploads:/app/private_uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: courtassist
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: courtassist
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U courtassist"]
+      interval: 5s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+volumes:
+  postgres_data:
+  profile_uploads:

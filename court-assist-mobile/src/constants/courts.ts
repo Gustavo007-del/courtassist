@@ -1,0 +1,2 @@
+export const KERALA_DISTRICTS = ['Alappuzha', 'Ernakulam', 'Idukki', 'Kannur', 'Kasaragod', 'Kollam', 'Kottayam', 'Kozhikode', 'Malappuram', 'Palakkad', 'Pathanamthitta', 'Thiruvananthapuram', 'Thrissur', 'Wayanad'] as const;
+export const COURT_TYPES = ['Supreme Court', 'High Court', 'District Court', 'Sessions Court', 'Subordinate Court', 'Family Court', 'Magistrate Court', 'Munsiff Court', 'Consumer Commission', 'Tribunal', 'Other'] as const;
