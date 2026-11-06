@@ -12,13 +12,16 @@
       "supportsTablet": true
     },
     "android": {
+      "allowBackup": false,
+      "blockedPermissions": ["android.permission.RECORD_AUDIO"],
       "adaptiveIcon": {
         "backgroundColor": "#12263A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "package": "in.courtassist.advocate"
+      "package": "in.courtassist.advocate",
+      "versionCode": 1
     },
     "web": {
       "output": "server",
@@ -26,8 +29,11 @@
     },
     "plugins": [
       "expo-router",
+      ["expo-camera", { "cameraPermission": "Allow Court Assist to capture private legal documents.", "recordAudioAndroid": false }],
+      "expo-sharing",
       "expo-secure-store",
       "expo-sqlite",
+      "expo-background-task",
       "expo-notifications",
       ["expo-local-authentication", { "faceIDPermission": "Allow Court Assist to use Face ID to unlock the app." }],
       ["expo-image-picker", { "photosPermission": "Allow Court Assist to select a private profile image or signature.", "cameraPermission": "Allow Court Assist to take a private profile image or signature.", "microphonePermission": false }],

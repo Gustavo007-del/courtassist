@@ -1,7 +1,12 @@
 .env
+.env.*
 .venv
 __pycache__
 .pytest_cache
 tests
 *.pyc
 private_uploads
+
+**/google-services.json
+**/*firebase-adminsdk*.json
+secrets

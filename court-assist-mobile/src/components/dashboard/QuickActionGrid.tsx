@@ -1,6 +1,6 @@
 import { Alert, Pressable, View } from 'react-native';
 import { router, type Href } from 'expo-router';
-import { BriefcaseBusiness, CalendarPlus, CalendarClock, ClipboardPlus, ContactRound, NotebookPen, Receipt, ScanLine, type LucideIcon } from 'lucide-react-native';
+import { BriefcaseBusiness, CalendarPlus, CalendarClock, ClipboardPlus, ContactRound, NotebookPen, Receipt, ScanLine, type LucideIcon, FileText } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { AppText } from '../common/AppText';
 import { useTheme } from '../../theme/tokens';
@@ -10,10 +10,14 @@ const actions: { key: string; icon: LucideIcon; route?: Href }[] = [
   { key: 'addClient', icon: ContactRound, route: '/clients/add' },
   { key: 'addHearing', icon: CalendarPlus, route: '/hearings/add' },
   { key: 'scanDocument', icon: ScanLine, route: '/(tabs)/scanner' },
-  { key: 'createTask', icon: ClipboardPlus },
+  { key: 'createTask', icon: ClipboardPlus, route: '/tasks/add' },
   { key: 'addDiary', icon: NotebookPen },
-  { key: 'addAppointment', icon: CalendarClock },
-  { key: 'recordPayment', icon: Receipt },
+  { key: 'addAppointment', icon: CalendarClock, route: '/appointments/add' },
+  { key: 'recordPayment', icon: Receipt, route: { pathname: '/finance/form', params: { kind: 'payments' } } },
+  { key: 'createDraft', icon: FileText, route: '/drafting/create' },
+  { key: 'finance', icon: Receipt, route: '/finance' },
+  { key: 'research', icon: FileText, route: '/research' },
+  { key: 'practiceTools', icon: FileText, route: '/practice-tools' },
 ];
 
 export function QuickActionGrid() {

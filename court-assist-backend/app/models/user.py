@@ -1,6 +1,6 @@
 import uuid
-from datetime import date, datetime, timezone
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, JSON, String, Uuid
+from datetime import date, datetime, time, timezone
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, JSON, String, Uuid, Time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.base import Base
 
@@ -58,6 +58,25 @@ class UserPreference(Base):
     appointment_reminders: Mapped[bool] = mapped_column(Boolean, default=True)
     payment_reminders: Mapped[bool] = mapped_column(Boolean, default=True)
     daily_summary: Mapped[bool] = mapped_column(Boolean, default=False)
+    push_notifications: Mapped[bool]=mapped_column(Boolean,default=False,server_default='false')
+    local_notifications: Mapped[bool]=mapped_column(Boolean,default=True,server_default='true')
+    email_notifications: Mapped[bool]=mapped_column(Boolean,default=False,server_default='false')
+    document_reminders: Mapped[bool]=mapped_column(Boolean,default=False,server_default='false')
+    draft_reminders: Mapped[bool]=mapped_column(Boolean,default=False,server_default='false')
+    hearing_auto_reminders: Mapped[bool]=mapped_column(Boolean,default=False,server_default='false')
+    hearing_reminder_days: Mapped[list]=mapped_column(JSON,default=lambda:[1],server_default='[1]')
+    reminder_time: Mapped[time]=mapped_column(Time,default=lambda:time(9),server_default='09:00:00')
+    daily_summary_time: Mapped[time]=mapped_column(Time,default=lambda:time(8),server_default='08:00:00')
+    quiet_start: Mapped[time|None]=mapped_column(Time)
+    quiet_end: Mapped[time|None]=mapped_column(Time)
+    urgent_quiet_override: Mapped[bool]=mapped_column(Boolean,default=False,server_default='false')
+    task_due_today: Mapped[bool]=mapped_column(Boolean,default=False,server_default='false')
+    task_overdue_alerts: Mapped[bool]=mapped_column(Boolean,default=False,server_default='false')
+    task_high_priority: Mapped[bool]=mapped_column(Boolean,default=False,server_default='false')
+    overdue_repeat_days: Mapped[int|None]=mapped_column(Integer)
+    payment_due_days: Mapped[int]=mapped_column(Integer,default=1,server_default='1')
+    finance_auto_reminders: Mapped[bool]=mapped_column(Boolean,default=False,server_default='false')
+    notification_checked_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True),index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
     user: Mapped[User] = relationship(back_populates='preferences')
 
@@ -84,3 +103,5 @@ class PasswordResetToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 Index('ix_refresh_sessions_family_active', RefreshSession.family_id, RefreshSession.revoked_at)
+Index('ix_refresh_sessions_owner_family_active', RefreshSession.user_id, RefreshSession.family_id,
+      RefreshSession.expires_at, postgresql_where=RefreshSession.revoked_at.is_(None))

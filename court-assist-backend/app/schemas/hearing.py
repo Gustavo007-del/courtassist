@@ -4,7 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 HearingStatus = Literal['Scheduled', 'Completed', 'Adjourned', 'Cancelled', 'Postponed', 'Awaiting Order']
-ReminderType = Literal['day_of', 'one_day', 'three_days', 'one_week', 'custom']
+ReminderType = Literal['day_of', 'one_day', 'two_days', 'three_days', 'one_week', 'custom']
 
 class HearingFields(BaseModel):
     case_id: UUID

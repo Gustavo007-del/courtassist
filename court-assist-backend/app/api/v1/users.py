@@ -1,17 +1,32 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from app.api.v1.dependencies import current_user
+from app.api.v1.rate_limit import auth_rate_limit
 from app.database.session import get_db
 from app.models.user import User
 from app.schemas.user import UserOut, UserUpdate
 from app.schemas.preferences import PreferencesOut, PreferencesUpdate
 from app.schemas.image import ImageConfirm, ImageUploadRequest, ImageUploadUrl
 from app.services.user_service import update_profile, update_preferences
-from app.services import image_service
+from app.services import account_erasure, image_service
 
 router = APIRouter(prefix='/users', tags=['users'])
+
+
+class ErasureRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+
+
+class ErasureReceipt(BaseModel):
+    id: UUID
+
+
+@router.post('/me/erasure-requests', response_model=ErasureReceipt, status_code=202, dependencies=[Depends(auth_rate_limit)])
+def request_erasure(data: ErasureRequest, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return account_erasure.request_erasure(db, user.id, data.password)
 
 
 @router.get('/me', response_model=UserOut)

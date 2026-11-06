@@ -23,7 +23,8 @@ class DiaryFields(BaseModel):
     @classmethod
     def trim(cls, value): return value.strip() if isinstance(value, str) else value
 
-class DiaryCreate(DiaryFields): pass
+class DiaryCreate(DiaryFields):
+    request_id: str | None = Field(default=None, min_length=8, max_length=64)
 
 class DiaryUpdate(BaseModel):
     hearing_id: UUID | None = None

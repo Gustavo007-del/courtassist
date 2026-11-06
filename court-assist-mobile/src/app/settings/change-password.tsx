@@ -23,7 +23,7 @@ export default function ChangePassword() {
   const [error, setError] = useState<string | null>(null);
   const save = handleSubmit(async (values) => {
     setError(null);
-    try { await authApi.changePassword(values.current, values.password, values.confirm); await useAuthStore.getState().clear(); client.clear(); useAppStore.getState().showToast(t('security.passwordChanged')); router.replace('/(auth)/login'); }
+    try { await authApi.changePassword(values.current, values.password, values.confirm); await useAuthStore.getState().clear(true); client.clear(); useAppStore.getState().showToast(t('security.passwordChanged')); router.replace('/(auth)/login'); }
     catch (caught) { setError(caught instanceof ApiError && caught.status === 400 ? t('security.currentIncorrect') : friendlyError(caught)); }
   });
   return <Screen title={t('security.changePassword')}>

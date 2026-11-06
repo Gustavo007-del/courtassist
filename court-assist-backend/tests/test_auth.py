@@ -22,6 +22,12 @@ Base.metadata.create_all(engine)
 
 
 def test_auth_lifecycle(monkeypatch):
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, 'smtp_host', 'smtp.example.invalid')
+    monkeypatch.setattr(settings, 'smtp_from', 'noreply@example.invalid')
+    monkeypatch.setattr(settings, 'reset_url_base', 'courtassist://reset-password')
     def session_override():
         with Session(engine) as session:
             yield session

@@ -1,0 +1,1 @@
+export const DIARY_CATEGORIES = ['Hearing', 'Court Proceedings', 'Judge Directions', 'Arguments', 'Evidence', 'Witness Examination', 'Filing', 'Client Meeting', 'Client Communication', 'Legal Research', 'Case Observation', 'Follow-up', 'General Note', 'Other'] as const;

@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends, status
-from sqlalchemy import func, select
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 from app.api.v1.dependencies import current_user
 from app.api.v1.rate_limit import auth_rate_limit
 from app.database.session import get_db
 from app.models.user import RefreshSession, User
-from app.schemas.auth import (ChangePasswordIn, ForgotPasswordIn, LoginIn, MessageOut, RefreshIn, SessionInfoOut,
+from app.schemas.auth import (ActiveSessionOut, ChangePasswordIn, ForgotPasswordIn, LoginIn, MessageOut, RefreshIn, SessionInfoOut,
                               RegisterIn, ResetPasswordIn, TokenOut)
 from app.schemas.user import UserOut
 from app.services import auth_service
@@ -31,7 +33,14 @@ def refresh(data: RefreshIn, db: Session = Depends(get_db)):
 
 @router.post('/logout', response_model=MessageOut)
 def logout(data: RefreshIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    auth_service.lock_account(db, user.id)
+    if data.device_id or data.installation_id:
+        from app.models.notifications import UserDevice
+        from app.services.notification_devices import revoke
+        device = db.scalar(select(UserDevice).where(UserDevice.id == data.device_id if data.device_id else UserDevice.installation_id == data.installation_id, UserDevice.user_id == user.id))
+        if device: revoke(db, device)
     auth_service.logout(db, data.refresh_token, user)
+    db.commit()
     return MessageOut(detail='Signed out')
 
 
@@ -59,3 +68,23 @@ def sessions(user: User = Depends(current_user), db: Session = Depends(get_db)):
         RefreshSession.user_id == user.id, RefreshSession.revoked_at.is_(None),
         RefreshSession.expires_at > now_utc())) or 0
     return SessionInfoOut(active_sessions=count, last_login_at=user.last_login_at)
+
+
+@router.get('/sessions/devices', response_model=list[ActiveSessionOut])
+def active_sessions(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    rows = db.execute(select(RefreshSession.family_id, func.max(RefreshSession.created_at), func.max(RefreshSession.expires_at)).where(
+        RefreshSession.user_id == user.id, RefreshSession.revoked_at.is_(None), RefreshSession.expires_at > now_utc(),
+    ).group_by(RefreshSession.family_id).order_by(func.max(RefreshSession.created_at).desc()).limit(100))
+    return [ActiveSessionOut(id=family, refreshed_at=seen, expires_at=expires, current=family == request.state.session_family)
+            for family, seen, expires in rows]
+
+
+@router.delete('/sessions/{family_id}', status_code=204)
+def revoke_session(family_id: UUID, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    auth_service.lock_account(db, user.id)
+    result = db.execute(update(RefreshSession).where(
+        RefreshSession.user_id == user.id, RefreshSession.family_id == family_id, RefreshSession.revoked_at.is_(None),
+    ).values(revoked_at=now_utc()))
+    if not result.rowcount:
+        raise HTTPException(404, 'Session unavailable')
+    db.commit()

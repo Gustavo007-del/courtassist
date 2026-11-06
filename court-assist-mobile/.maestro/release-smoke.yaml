@@ -1,0 +1,26 @@
+appId: in.courtassist.advocate
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Sign in"
+- tapOn: "Sign in"
+- assertVisible: "Enter an email address or phone number"
+- tapOn: "Email or phone number"
+- inputText: ${SMOKE_EMAIL}
+- tapOn: "Password"
+- inputText: ${SMOKE_PASSWORD}
+- hideKeyboard
+- tapOn: "Sign in"
+- extendedWaitUntil:
+    visible: "Cases"
+    timeout: 20000
+- tapOn: "Cases"
+- assertVisible: "Add case"
+- tapOn: "Calendar"
+- assertVisible: "Calendar"
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Cases"
+    timeout: 20000
+

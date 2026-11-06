@@ -1,3 +1,4 @@
+from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator, model_validator
 from app.schemas.user import UserOut
@@ -8,7 +9,7 @@ class RegisterIn(BaseModel):
     email: str | None = None
     phone_number: str | None = None
     password: str = Field(min_length=12, max_length=128)
-    confirm_password: str
+    confirm_password: str = Field(max_length=128)
     preferred_language: str = Field(default='en', pattern='^(en|ml)$')
 
     @field_validator('full_name')
@@ -29,22 +30,24 @@ class RegisterIn(BaseModel):
 
 
 class LoginIn(BaseModel):
-    identifier: str = Field(min_length=3)
-    password: str
+    identifier: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=1, max_length=128)
 
 
 class RefreshIn(BaseModel):
-    refresh_token: str
+    refresh_token: str = Field(min_length=1, max_length=128)
+    device_id: UUID | None = None
+    installation_id: UUID | None = None
 
 
 class ForgotPasswordIn(BaseModel):
-    email: str
+    email: str = Field(max_length=320)
 
 
 class ResetPasswordIn(BaseModel):
-    token: str
+    token: str = Field(min_length=1, max_length=128)
     password: str = Field(min_length=12, max_length=128)
-    confirm_password: str
+    confirm_password: str = Field(max_length=128)
 
     @model_validator(mode='after')
     def passwords_match(self):
@@ -54,9 +57,9 @@ class ResetPasswordIn(BaseModel):
 
 
 class ChangePasswordIn(BaseModel):
-    current_password: str
+    current_password: str = Field(min_length=1, max_length=128)
     new_password: str = Field(min_length=12, max_length=128)
-    confirm_password: str
+    confirm_password: str = Field(max_length=128)
 
     @model_validator(mode='after')
     def passwords_match(self):
@@ -81,3 +84,10 @@ class MessageOut(BaseModel):
 class SessionInfoOut(BaseModel):
     active_sessions: int
     last_login_at: datetime | None
+
+
+class ActiveSessionOut(BaseModel):
+    id: UUID
+    refreshed_at: datetime
+    expires_at: datetime
+    current: bool

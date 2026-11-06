@@ -1,4 +1,10 @@
 .env
+.env.*
+!.env.example
+*.jks
+*.keystore
+credentials.json
+*.dump.age
 *.pyc
 __pycache__/
 .venv/
@@ -11,11 +17,11 @@ build/
 *.db
 *.sqlite3
 private_uploads/
+court-assist-backend/tmp/
 
 
-git init
-gh repo create courtassist --public --source=. --remote=origin
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git push -u origin main
+
+# Firebase server credentials must never enter source control.
+**/google-services.json
+**/*firebase-adminsdk*.json
+**/secrets/

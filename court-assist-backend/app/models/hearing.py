@@ -34,6 +34,7 @@ class Hearing(Base):
     case: Mapped['Case'] = relationship(foreign_keys=[case_id])
     court: Mapped['Court | None'] = relationship(foreign_keys=[court_id])
     reminders: Mapped[list['HearingReminder']] = relationship(back_populates='hearing', cascade='all, delete-orphan')
+    diary_entries: Mapped[list['CaseDiaryEntry']] = relationship(back_populates='hearing')
 
 class HearingReminder(Base):
     __tablename__ = 'hearing_reminders'

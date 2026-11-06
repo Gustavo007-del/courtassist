@@ -45,3 +45,14 @@ Hearings, appointments, diary, document vault/OCR, tasks, fees, AI, and offline 
 `Hearing` belongs to both an advocate and one of that advocate's cases. Every hearing read or mutation scopes by the authenticated user, and creation resolves the case through the existing ownership check. `HearingReminder` belongs to the same advocate and hearing. Completing, adjourning, or postponing a hearing preserves its original row and creates a separate linked follow-up row in one database transaction. Repeated finalization is rejected once the original status changes. Calendar lists use `hearing_date`; nullable `hearing_time` is never filled with a display placeholder.
 
 Reminder records store a UTC delivery instant. For date-only hearings, the service selects 09:00 in the advocate's timezone as the **reminder delivery time**, never as the hearing time. Local OS scheduling is performed by the mobile client with generic notification content; the server does not mark it delivered. Push transport and a worker are deployment dependencies still outstanding.
+## Phase 6 private diary and timeline
+
+`CaseDiaryEntry` holds the advocate's private working notes. Ownership is checked against both the entry and parent case on every route; an optional hearing is checked for the same owner and case. The `user_id` is taken from authentication, never the request body. Entry text is excluded from case activity logs. Creation, modification, pin/important changes, and deletion append minimal case activity events in the same transaction. A stable per-form `request_id` prevents duplicate entries and activity events after a create retry. The existing timeline endpoint filters those stored events without duplicating rows or altering earlier case and hearing history.
+
+## Phase 13 notifications
+
+Business ORM changes publish a transactional notification outbox. A separate Celery worker and one Beat instance reconcile existing hearing/planning configuration into durable schedules and leased channel deliveries. Native Expo alarms and Android FCM share per-device reservations; provider acceptance is recorded separately from delivery. Token encryption, owner constraints and generic payloads preserve privacy. Details: [Phase 13](phase13-notifications.md).
+
+## Phase 15 offline storage
+
+The existing device SQLite database holds encrypted, owner-scoped snapshots and a durable queue. A PostgreSQL journal feeds incremental pulls. Pushes replay through existing business rules with stable identifiers, transactional receipts and explicit review of stale edits. Vault files stay opt-in and use the existing signed transfer APIs. See [Phase 15 offline architecture and handover](phase15-offline.md).

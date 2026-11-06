@@ -77,7 +77,7 @@ def create_case(db, user, data: CaseCreate):
     for party in data.parties: check_client(db, user, party.client_id)
     duplicate_check(db, user, data.court_id, data.case_number, data.cnr_number)
     values = data.model_dump(exclude={'initial_status', 'parties', 'advocates'})
-    item = Case(user_id=user.id, current_status=data.initial_status, disposed_at=datetime.now(timezone.utc) if data.initial_status in DISPOSED else None, **values)
+    item = Case(id=db.info.get("sync_record_id"), user_id=user.id, current_status=data.initial_status, disposed_at=datetime.now(timezone.utc) if data.initial_status in DISPOSED else None, **values)
     db.add(item); db.flush()
     log(db, user, item, 'case_created', 'Case created')
     db.add(CaseStatusHistory(case_id=item.id, user_id=user.id, previous_status=data.initial_status, new_status=data.initial_status, effective_date=data.filing_date))

@@ -1,0 +1,81 @@
+name: courtassist
+x-app: &app
+  image: courtassist-backend:${COURTASSIST_RELEASE:-local}
+  build:
+    context: .
+    dockerfile: Dockerfile.production
+  env_file: ${COURTASSIST_CONFIG:-.env.production}
+  restart: unless-stopped
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=256m
+  logging:
+    driver: local
+    options: {max-size: "20m", max-file: "5"}
+services:
+  migrate:
+    <<: *app
+    profiles: [maintenance]
+    restart: "no"
+    command: [alembic, upgrade, head]
+  api:
+    <<: *app
+    environment:
+      API_HEALTH_HOST: ${COURTASSIST_DOMAIN:?set COURTASSIST_DOMAIN}
+      # Only the dedicated ingress below occupies this fixed address on the private bridge.
+      FORWARDED_ALLOW_IPS: ${COURTASSIST_PROXY_IP:-172.29.163.10}
+    volumes:
+      - profile_uploads:/app/private_uploads
+    networks: [backend]
+    mem_limit: 1536m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8000/api/v1/ready',headers={'Host':os.environ['API_HEALTH_HOST']}),timeout=4).close()"]
+      interval: 20s
+      timeout: 6s
+      retries: 4
+  ocr_worker:
+    <<: *app
+    command: [celery, -A, app.workers.ocr.celery_app, worker, -Q, court-assist-ocr, --hostname=ocr@%h, --loglevel=WARNING, --concurrency=1, --max-tasks-per-child=20]
+    mem_limit: 1536m
+  ai_worker:
+    <<: *app
+    profiles: [ai]
+    command: [celery, -A, app.workers.ocr.celery_app, worker, -Q, court-assist-ai, --hostname=ai@%h, --loglevel=WARNING, --concurrency=1]
+    mem_limit: 1024m
+  notification_worker:
+    <<: *app
+    command: [celery, -A, app.workers.notifications.celery_app, worker, -Q, court-assist-notifications, --hostname=notification@%h, --loglevel=WARNING, --concurrency=1]
+    mem_limit: 768m
+  scheduler:
+    <<: *app
+    command: [celery, -A, app.workers.notifications.celery_app, beat, --loglevel=WARNING, --schedule=/tmp/beat]
+    mem_limit: 512m
+  ingress:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      COURTASSIST_DOMAIN: ${COURTASSIST_DOMAIN:?set COURTASSIST_DOMAIN}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      backend:
+        ipv4_address: ${COURTASSIST_PROXY_IP:-172.29.163.10}
+    depends_on:
+      api:
+        condition: service_healthy
+networks:
+  backend:
+    ipam:
+      config:
+        - subnet: ${COURTASSIST_PROXY_SUBNET:-172.29.163.0/24}
+volumes:
+  profile_uploads:
+  caddy_data:
+  caddy_config:
+

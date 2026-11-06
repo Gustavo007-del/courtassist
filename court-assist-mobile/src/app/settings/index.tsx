@@ -19,12 +19,13 @@ export default function Settings() {
     <SettingsSection title={t('settings.language')}><SettingsRow label={t('settings.languageDetail')} onPress={() => router.push('/settings/language')} /></SettingsSection>
     <SettingsSection title={t('settings2.regional')}><SettingsRow label={t('settings2.regionalDetail')} onPress={() => router.push('/settings/regional')} /></SettingsSection>
     <SettingsSection title={t('settings2.notifications')}><SettingsRow label={t('settings2.notificationsDetail')} onPress={() => router.push('/settings/notifications')} /></SettingsSection>
+    <SettingsSection title={t('ai.optional')}><SettingsRow label={t('ai.preferences')} onPress={() => router.push('/ai/preferences')} /></SettingsSection>
     <SettingsSection title={t('settings2.security')}>
       <SettingsRow label={t('security.changePassword')} onPress={() => router.push('/settings/change-password')} />
       <SettingsRow label={t('security.biometricLock')} onPress={() => router.push('/settings/security')} />
       <SettingsRow label={t('security.session')} onPress={() => router.push('/settings/security')} />
     </SettingsSection>
-    <SettingsSection title={t('settings2.dataSync')}><SettingsRow label={t('settings2.syncFuture')} /></SettingsSection>
+    <SettingsSection title={t('sync.title')}><SettingsRow label={t('sync.title')} onPress={() => router.push('/sync')} /></SettingsSection>
     <SettingsSection title={t('settings2.about')}><SettingsRow label={t('appName')} onPress={() => router.push('/settings/about')} /></SettingsSection>
   </Screen>;
 }

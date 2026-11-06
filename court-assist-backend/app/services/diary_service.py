@@ -1,6 +1,7 @@
 from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 from app.models.diary import CaseDiaryEntry
 from app.models.case import Case
@@ -46,13 +47,26 @@ def list_entries(db, user, limit, offset, case_id=None, hearing_id=None, q=None,
     items = db.scalars(select(CaseDiaryEntry).options(selectinload(CaseDiaryEntry.case), selectinload(CaseDiaryEntry.hearing)).where(*filters).order_by(*sort).offset(offset).limit(limit)).all()
     return total, [serialize(item) for item in items]
 
-def create(db, user, data: DiaryCreate):
+def create(db, user, data: DiaryCreate, *, commit=True):
     case = owned_case(db, user, data.case_id, include_archived=True)
     check_hearing(db, user, data.hearing_id, case.id)
-    item = CaseDiaryEntry(user_id=user.id, **data.model_dump())
+    if data.request_id:
+        existing = db.scalar(select(CaseDiaryEntry).where(CaseDiaryEntry.user_id == user.id, CaseDiaryEntry.request_id == data.request_id))
+        if existing:
+            if existing.case_id != data.case_id or existing.hearing_id != data.hearing_id: raise HTTPException(409, 'Request identifier already used')
+            return serialize(existing)
+    item = CaseDiaryEntry(id=db.info.get("sync_record_id"), user_id=user.id, **data.model_dump())
     db.add(item); db.flush()
     log(db, user, case, 'diary_created', 'Private diary entry created', details={'diary_entry_id': str(item.id), 'important': item.is_important})
-    db.commit()
+    if not commit:
+        return serialize(item)
+    try: db.commit()
+    except IntegrityError:
+        db.rollback()
+        if data.request_id:
+            existing = db.scalar(select(CaseDiaryEntry).where(CaseDiaryEntry.user_id == user.id, CaseDiaryEntry.request_id == data.request_id))
+            if existing: return serialize(existing)
+        raise HTTPException(409, 'Diary entry could not be created')
     return serialize(owned_entry(db, user, item.id))
 
 def update(db, user, entry_id, data: DiaryUpdate):

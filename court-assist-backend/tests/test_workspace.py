@@ -89,7 +89,7 @@ def test_workspace_profile_dashboard_activity_and_private_image(tmp_path):
                 'current_password': 'StrongPassword123', 'new_password': 'EvenStrongerPassword456',
                 'confirm_password': 'EvenStrongerPassword456'})
             assert changed_password.status_code == 200
-            assert client.get('/api/v1/auth/sessions', headers=first).json()['active_sessions'] == 0
+            assert client.get('/api/v1/auth/sessions', headers=first).status_code == 401
             assert client.post('/api/v1/auth/login', json={'identifier': 'first@example.com', 'password': 'StrongPassword123'}).status_code == 401
             assert client.post('/api/v1/auth/login', json={'identifier': 'first@example.com', 'password': 'EvenStrongerPassword456'}).status_code == 200
     finally:

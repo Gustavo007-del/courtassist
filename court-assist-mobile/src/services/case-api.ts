@@ -17,7 +17,7 @@ export const caseApi = {
   list: (filters: Record<string, string | number | boolean | undefined | null>) => apiRequest<Page<CaseRecord>>(`${root}?${query(filters)}`),
   get: (id: string, archived = false) => apiRequest<CaseRecord>(`${root}/${id}?include_archived=${archived}`),
   create: (data: CaseInput & { initial_status: CaseStatus; parties: CasePartyInput[]; advocates: CaseAdvocateInput[] }) => apiRequest<CaseRecord>(root, { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<CaseInput>) => apiRequest<CaseRecord>(`${root}/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<CaseInput>, offlineBase?: string) => apiRequest<CaseRecord>(`${root}/${id}`, { method: 'PATCH', offlineBase, body: JSON.stringify(data) }),
   archive: (id: string) => apiRequest<CaseRecord>(`${root}/${id}/archive`, { method: 'POST' }), restore: (id: string) => apiRequest<CaseRecord>(`${root}/${id}/restore`, { method: 'POST' }),
   parties: (id: string) => apiRequest<CaseParty[]>(`${root}/${id}/parties`),
   addParty: (id: string, data: CasePartyInput) => apiRequest<CaseParty>(`${root}/${id}/parties`, { method: 'POST', body: JSON.stringify(data) }),
@@ -30,5 +30,5 @@ export const caseApi = {
   history: (id: string) => apiRequest<CaseStatusEvent[]>(`${root}/${id}/status-history`),
   status: (id: string, data: { new_status: CaseStatus; reason: string | null; effective_date: string }) => apiRequest<CaseStatusEvent>(`${root}/${id}/status`, { method: 'POST', body: JSON.stringify(data) }),
   activities: (id: string, offset = 0) => apiRequest<Page<CaseEvent>>(`${root}/${id}/activities?${query({ limit: 30, offset })}`),
-  timeline: (id: string, order: 'newest' | 'oldest', offset = 0) => apiRequest<Page<CaseEvent>>(`${root}/${id}/timeline?${query({ order, limit: 30, offset })}`),
+  timeline: (id: string, order: 'newest' | 'oldest', offset = 0, category = '', fromDate = '', toDate = '') => apiRequest<Page<CaseEvent>>(`${root}/${id}/timeline?${query({ order, category, from_date: fromDate, to_date: toDate, limit: 30, offset })}`),
 };

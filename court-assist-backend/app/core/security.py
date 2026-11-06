@@ -46,21 +46,31 @@ def verify_password(value: str, hashed: str) -> bool:
         return False
 
 
-def create_access_token(user_id: UUID) -> str:
+def create_access_token(user_id: UUID, family_id: UUID | None = None) -> str:
     settings = get_settings()
     now = datetime.now(timezone.utc)
-    return jwt.encode({'sub': str(user_id), 'type': 'access', 'iat': now, 'exp': now + timedelta(minutes=settings.access_token_expire_minutes)}, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    claims = {'sub': str(user_id), 'type': 'access', 'iat': now, 'exp': now + timedelta(minutes=settings.access_token_expire_minutes)}
+    if family_id is not None:
+        claims['sid'] = str(family_id)
+    return jwt.encode(claims, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
-def decode_access_token(token: str) -> UUID:
+def decode_access_session(token: str) -> tuple[UUID, UUID | None]:
     settings = get_settings()
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm], options={'require': ['sub', 'exp', 'type']})
         if payload['type'] != 'access':
             raise ValueError()
-        return UUID(payload['sub'])
-    except (jwt.PyJWTError, ValueError, KeyError):
+        session = UUID(payload['sid']) if 'sid' in payload else None
+        if session is None and settings.hardened:
+            raise ValueError()
+        return UUID(payload['sub']), session
+    except (jwt.PyJWTError, ValueError, KeyError, TypeError, AttributeError):
         raise HTTPException(401, 'Invalid or expired access token', headers={'WWW-Authenticate': 'Bearer'}) from None
+
+
+def decode_access_token(token: str) -> UUID:
+    return decode_access_session(token)[0]
 
 
 def new_opaque_token() -> str:

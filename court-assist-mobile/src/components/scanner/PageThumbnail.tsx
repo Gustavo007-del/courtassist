@@ -1,0 +1,7 @@
+import { Image, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { AppText } from '../common/AppText';
+import { Button } from '../common/Button';
+import { Card } from '../common/Card';
+import type { ScanPage } from '../../features/scanner/types';
+export function PageThumbnail({ page, index, total, onEdit, onRetake, onRemove, onMove }: { page: ScanPage; index: number; total: number; onEdit: () => void; onRetake: () => void; onRemove: () => void; onMove: (direction: -1 | 1) => void }) { const { t } = useTranslation(); return <Card style={{ marginBottom: 10 }}><View style={{ flexDirection: 'row', gap: 12 }}><Image source={{ uri: page.uri }} style={{ width: 76, height: 108, borderRadius: 8 }} resizeMode="contain" /><View style={{ flex: 1, gap: 3 }}><AppText style={{ fontWeight: '800' }}>{t('scanner.page')} {index + 1} / {total}</AppText><AppText>{page.width} × {page.height}</AppText><View style={{ flexDirection: 'row', flexWrap: 'wrap' }}><Button label="↑" variant="text" disabled={index === 0} onPress={() => onMove(-1)} /><Button label="↓" variant="text" disabled={index === total - 1} onPress={() => onMove(1)} /></View></View></View><View style={{ flexDirection: 'row', flexWrap: 'wrap' }}><Button label={t('scanner.editPage')} variant="text" onPress={onEdit} /><Button label={t('scanner.retake')} variant="text" onPress={onRetake} /><Button label={t('scanner.removePage')} variant="text" onPress={onRemove} /></View></Card>; }

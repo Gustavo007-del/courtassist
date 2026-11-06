@@ -10,6 +10,7 @@ depends_on = None
 def upgrade():
     op.create_table('case_diary_entries',
         sa.Column('id', sa.Uuid(), primary_key=True),
+        sa.Column('request_id', sa.String(64)),
         sa.Column('user_id', sa.Uuid(), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
         sa.Column('case_id', sa.Uuid(), sa.ForeignKey('cases.id', ondelete='CASCADE'), nullable=False),
         sa.Column('hearing_id', sa.Uuid(), sa.ForeignKey('hearings.id', ondelete='SET NULL')),
@@ -21,7 +22,8 @@ def upgrade():
         sa.Column('next_action', sa.Text()), sa.Column('follow_up_date', sa.Date()),
         sa.Column('is_important', sa.Boolean(), nullable=False), sa.Column('is_pinned', sa.Boolean(), nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False))
+        sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+        sa.UniqueConstraint('user_id', 'request_id', name='uq_diary_owner_request'))
     op.create_index('ix_diary_owner_case_date', 'case_diary_entries', ['user_id', 'case_id', 'entry_date'])
     op.create_index('ix_diary_owner_date', 'case_diary_entries', ['user_id', 'entry_date'])
     op.create_index('ix_diary_owner_hearing', 'case_diary_entries', ['user_id', 'hearing_id'])

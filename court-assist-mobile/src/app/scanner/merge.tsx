@@ -1,0 +1,24 @@
+import { useState } from 'react';
+import { View } from 'react-native';
+import { router } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
+import { File } from 'expo-file-system';
+import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import { AppText } from '../../components/common/AppText';
+import { Button } from '../../components/common/Button';
+import { Card } from '../../components/common/Card';
+import { Notice } from '../../components/common/Notice';
+import { TextField } from '../../components/common/TextField';
+import { Screen } from '../../components/layout/Screen';
+import { mergePdfs } from '../../features/scanner/pdf-tools';
+import { savePdfCopy } from '../../features/scanner/storage';
+import { useAuthStore } from '../../store/auth-store';
+import { friendlyError } from '../../utils/errors';
+type Picked = { uri: string; name: string; size?: number };
+export default function MergePdfs() { const { t } = useTranslation(); const user = useAuthStore((state) => state.user); const cache = useQueryClient(); const [files, setFiles] = useState<Picked[]>([]); const [name, setName] = useState(''); const [busy, setBusy] = useState(false); const [progress, setProgress] = useState(''); const [error, setError] = useState<string | null>(null);
+  const pick = async () => { try { const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', multiple: true, copyToCacheDirectory: true }); if (!result.canceled) setFiles((current) => [...current, ...result.assets.map(({ uri, name, size }) => ({ uri, name, size }))]); } catch (caught) { setError(friendlyError(caught)); } };
+  const move = (index: number, direction: -1 | 1) => { const target = index + direction; if (target < 0 || target >= files.length) return; const next = [...files]; [next[index], next[target]] = [next[target], next[index]]; setFiles(next); };
+  const generate = async () => { if (!user || files.length < 2 || busy) return; setBusy(true); setError(null); try { const bytes = await mergePdfs(files.map((file) => file.uri), (done, total) => setProgress(`${done}/${total}`)); const { PDFDocument } = await import('pdf-lib'); const count = (await PDFDocument.load(bytes)).getPageCount(); const item = await savePdfCopy(user.id, bytes, name.trim() || t('scanner.mergedName'), count); await cache.invalidateQueries({ queryKey: ['local-documents', user.id] }); for (const file of files) { const temporary = new File(file.uri); if (temporary.exists) temporary.delete(); } router.replace({ pathname: '/scanner/document-details', params: { id: item.id } }); } catch (caught) { setError(friendlyError(caught)); } finally { setBusy(false); setProgress(''); } };
+  return <Screen title={t('scanner.merge')} back>{error && <Notice message={error} />}<TextField label={t('scanner.documentTitle')} value={name} onChangeText={setName} /><Button label={t('scanner.selectPdfs')} onPress={() => { void pick(); }} /><AppText>{t('scanner.files')}: {files.length}</AppText>{files.map((file, index) => <Card key={`${file.uri}-${index}`} style={{ marginTop: 8 }}><AppText>{index + 1}. {file.name}</AppText><AppText>{file.size ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : ''}</AppText><View style={{ flexDirection: 'row' }}><Button label="↑" variant="text" disabled={index === 0} onPress={() => move(index, -1)} /><Button label="↓" variant="text" disabled={index === files.length - 1} onPress={() => move(index, 1)} /><Button label={t('scanner.removePage')} variant="text" onPress={() => setFiles(files.filter((_, i) => i !== index))} /></View></Card>)}{progress && <AppText>{t('scanner.processing')} {progress}</AppText>}<Button label={t('scanner.merge')} loading={busy} disabled={files.length < 2} onPress={() => { void generate(); }} /></Screen>;
+}

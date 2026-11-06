@@ -45,7 +45,7 @@ def create(db, user, data: HearingCreate):
     court_id = data.court_id if data.court_id is not None else case.court_id
     check_court(db, user, court_id)
     values = data.model_dump(exclude={'court_id'})
-    item = Hearing(user_id=user.id, court_id=court_id, status='Scheduled', **values)
+    item = Hearing(id=db.info.get("sync_record_id"), user_id=user.id, court_id=court_id, status='Scheduled', **values)
     db.add(item); db.flush()
     log(db, user, case, 'hearing_scheduled', 'Hearing scheduled', details={'hearing_id': str(item.id), 'date': str(item.hearing_date)})
     db.commit()
@@ -92,6 +92,7 @@ def proceedings(db, user, hearing_id, data: Proceedings, status):
                 courtroom=item.courtroom, judge_name=item.judge_name, purpose=item.purpose,
                 status='Scheduled', reminder_enabled=item.reminder_enabled)
             db.add(next_item); db.flush()
+            inherit_reminders(db, item, next_item)
             item.follow_up_hearing_id = next_item.id
             log(db, user, item.case, 'hearing_scheduled', 'Follow-up hearing scheduled', details={'hearing_id': str(next_item.id), 'date': str(next_item.hearing_date)})
     reschedule_reminders(db, item)
@@ -102,12 +103,13 @@ def proceedings(db, user, hearing_id, data: Proceedings, status):
 def reschedule(db, user, hearing_id, data: Reschedule):
     item = owned_hearing(db, user, hearing_id, lock=True)
     if item.status not in ACTIVE: raise HTTPException(409, 'Hearing already finalized')
-    next_item = Hearing(user_id=user.id, case_id=item.case_id, court_id=item.court_id, hearing_date=data.hearing_date,
+    next_item = Hearing(id=db.info.get("sync_followup_id"), user_id=user.id, case_id=item.case_id, court_id=item.court_id, hearing_date=data.hearing_date,
         hearing_time=data.hearing_time, estimated_end_time=data.estimated_end_time, hearing_type=item.hearing_type,
         hearing_stage=item.hearing_stage, courtroom=item.courtroom, judge_name=item.judge_name, purpose=item.purpose,
         status='Scheduled', reminder_enabled=item.reminder_enabled)
     item.status = 'Postponed'; item.adjournment_reason = data.reason; item.next_hearing_date = data.hearing_date; item.next_hearing_time = data.hearing_time
     db.add(next_item); db.flush(); item.follow_up_hearing_id = next_item.id
+    inherit_reminders(db, item, next_item)
     reschedule_reminders(db, item)
     log(db, user, item.case, 'hearing_postponed', 'Hearing postponed', details={'hearing_id': str(item.id), 'next_hearing_id': str(next_item.id)})
     db.commit()
@@ -119,38 +121,60 @@ def conflicts(db, user, hearing_date, hearing_time=None, estimated_end_time=None
     items = db.scalars(select(Hearing).options(selectinload(Hearing.case)).where(*filters)).all()
     results = []
     for item in items:
+        if times_overlap(hearing_date, hearing_time, estimated_end_time, item.hearing_time, item.estimated_end_time) is False:
+            continue
         if not hearing_time or not item.hearing_time:
             kind, reason = 'unknown_time', 'Hearing time is not specified'
         else:
-            candidate_end = estimated_end_time or (datetime.combine(hearing_date, hearing_time) + timedelta(minutes=DEFAULT_DURATION_MINUTES)).time()
-            other_end = item.estimated_end_time or (datetime.combine(hearing_date, item.hearing_time) + timedelta(minutes=DEFAULT_DURATION_MINUTES)).time()
-            if hearing_time >= other_end or item.hearing_time >= candidate_end: continue
             same_room = bool(court_id and courtroom and court_id == item.court_id and courtroom.casefold() == (item.courtroom or '').casefold())
             kind = 'confirmed' if estimated_end_time and item.estimated_end_time else 'estimated'
             reason = 'Same courtroom overlap' if same_room else 'Advocate has overlapping hearings'
         results.append(ConflictOut(hearing_id=item.id, case_title=item.case.case_title, kind=kind, reason=reason))
     return results
 
-def reminder_time(item, kind, custom=None, zone_name='Asia/Kolkata'):
+
+def times_overlap(day, start, end, other_start, other_end):
+    if start is None or other_start is None:
+        return True  # A date-only hearing is a possible conflict.
+    first = datetime.combine(day, start)
+    second = datetime.combine(day, other_start)
+    duration = timedelta(minutes=DEFAULT_DURATION_MINUTES)
+    first_end = datetime.combine(day, end) if end else first + duration
+    second_end = datetime.combine(day, other_end) if other_end else second + duration
+    return first < second_end and second < first_end
+
+def reminder_time(item, kind, custom=None, zone_name='Asia/Kolkata', reminder_clock=time(9, 0)):
     if kind == 'custom': return custom.astimezone(timezone.utc)
     zone = ZoneInfo(zone_name)
-    local = datetime.combine(item.hearing_date, item.hearing_time or time(9, 0), zone)
-    days = {'day_of': 0, 'one_day': 1, 'three_days': 3, 'one_week': 7}[kind]
+    local = datetime.combine(item.hearing_date, item.hearing_time or reminder_clock, zone)
+    days = {'day_of': 0, 'one_day': 1, 'two_days': 2, 'three_days': 3, 'one_week': 7}[kind]
     return (local - timedelta(days=days)).astimezone(timezone.utc)
 
 def reschedule_reminders(db, item):
     for reminder in db.scalars(select(HearingReminder).where(HearingReminder.hearing_id == item.id, HearingReminder.status.in_(['pending', 'scheduled_local', 'retry']))).all():
         if not item.reminder_enabled or item.status not in ACTIVE: reminder.status = 'cancelled'
         elif reminder.reminder_type != 'custom':
-            reminder.scheduled_at = reminder_time(item, reminder.reminder_type)
+            from app.services.notification_service import get_preferences
+            prefs = get_preferences(db, item.user_id)
+            reminder.scheduled_at = reminder_time(item, reminder.reminder_type, zone_name=prefs.timezone, reminder_clock=prefs.reminder_time)
             reminder.status = 'pending'
+        else: reminder.status = 'cancelled'
+
+def inherit_reminders(db, previous, following):
+    for old in db.scalars(select(HearingReminder).where(HearingReminder.hearing_id == previous.id, HearingReminder.status.in_(['pending','scheduled_local','retry']))).all():
+        if old.reminder_type != 'custom':
+            from app.services.notification_service import get_preferences
+            prefs = get_preferences(db, previous.user_id)
+            db.add(HearingReminder(user_id=previous.user_id, hearing_id=following.id, reminder_type=old.reminder_type, delivery_channel=old.delivery_channel, status='pending', scheduled_at=reminder_time(following, old.reminder_type, zone_name=prefs.timezone, reminder_clock=prefs.reminder_time)))
 
 def create_reminder(db, user, item, data: ReminderIn):
     if not item.reminder_enabled or item.status not in ACTIVE: raise HTTPException(409, 'Reminders are disabled for this hearing')
     if user.preferences and not user.preferences.hearing_reminders: raise HTTPException(409, 'Hearing reminders are disabled in notification settings')
-    if data.delivery_channel == 'push': raise HTTPException(503, 'Push delivery is not configured')
+    if data.delivery_channel == 'push':
+        from app.services.notification_channels import capabilities
+        if not capabilities(user)['push_configured']: raise HTTPException(503, 'Push delivery is not configured')
     existing = db.scalar(select(HearingReminder).where(HearingReminder.hearing_id == item.id, HearingReminder.reminder_type == data.reminder_type, HearingReminder.delivery_channel == data.delivery_channel))
-    scheduled = reminder_time(item, data.reminder_type, data.scheduled_at, user.preferences.timezone if user.preferences else 'Asia/Kolkata')
+    scheduled = reminder_time(item, data.reminder_type, data.scheduled_at, user.preferences.timezone if user.preferences else 'Asia/Kolkata', user.preferences.reminder_time if user.preferences else time(9))
     if existing:
         existing.scheduled_at = scheduled; existing.status = 'pending'; reminder = existing
     else:

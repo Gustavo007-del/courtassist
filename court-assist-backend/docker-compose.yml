@@ -14,6 +14,54 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+  ocr_worker:
+    build: .
+    command: celery -A app.workers.ocr.celery_app worker -Q court-assist-ocr --loglevel=WARNING --concurrency=1
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://courtassist:${POSTGRES_PASSWORD}@db:5432/courtassist
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+  ai_worker:
+    build: .
+    command: celery -A app.workers.ocr.celery_app worker -Q court-assist-ai --hostname=ai@%h --loglevel=WARNING --concurrency=1 --prefetch-multiplier=1
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://courtassist:${POSTGRES_PASSWORD}@db:5432/courtassist
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+  notification_worker:
+    build: .
+    command: celery -A app.workers.notifications.celery_app worker -Q court-assist-notifications --loglevel=WARNING --concurrency=1
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://courtassist:${POSTGRES_PASSWORD}@db:5432/courtassist
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+  notification_beat:
+    build: .
+    command: celery -A app.workers.notifications.celery_app beat --loglevel=WARNING --schedule=/tmp/court-assist-beat
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://courtassist:${POSTGRES_PASSWORD}@db:5432/courtassist
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
   db:
     image: postgres:17-alpine
     environment:

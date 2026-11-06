@@ -38,6 +38,7 @@ class Case(Base):
     advocates: Mapped[list['CaseAdvocate']] = relationship(back_populates='case', cascade='all, delete-orphan')
     status_history: Mapped[list['CaseStatusHistory']] = relationship(back_populates='case', cascade='all, delete-orphan')
     case_activities: Mapped[list['CaseActivity']] = relationship(back_populates='case', cascade='all, delete-orphan')
+    diary_entries: Mapped[list['CaseDiaryEntry']] = relationship(back_populates='case', cascade='all, delete-orphan')
 
 class CaseParty(Base):
     __tablename__ = 'case_parties'

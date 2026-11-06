@@ -18,6 +18,10 @@ class DashboardSummary(BaseModel):
     pending_tasks: int | None
     overdue_tasks: int | None
     upcoming_deadlines: int | None
+    tasks_due_today: int = 0
+    high_priority_tasks: int = 0
+    upcoming_appointments: int = 0
+    recently_completed_tasks: int = 0
 
 
 class ModuleAvailability(BaseModel):
